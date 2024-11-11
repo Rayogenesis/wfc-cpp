@@ -1,0 +1,28 @@
+<samples>
+  <execution type="Analysis"/>
+
+  <overlapping name="Chess" N="2" periodic="True"/>
+	
+  <overlapping name="Skyline" N="3" symmetry="2" ground="True" periodic="True"/>
+	
+  <overlapping name="Hogs" N="3" periodic="True"/>
+	
+  <overlapping name="Knot" N="3" periodic="True"/>
+	
+  <overlapping name="Paths" N="3" periodic="True"/>
+	
+  <overlapping name="Platformer" N="2" symmetry="2" ground="True" periodic="True"/>
+	
+  <overlapping name="Rule126" N="3" symmetry="2" periodicInput="False" periodic="False"/>
+
+  <overlapping name="Cats" N="3" symmetry="2" periodic="True"/>
+	
+  <simpletiled name="Summer" size="20"/>
+	
+  <simpletiled name="Knots" subset="Standard" size="24" periodic="True"/>
+	
+  <simpletiled name="FloorPlan" size="20"/>
+	
+  <simpletiled name="Summer" size="10" periodic="False" limit="25" blackBackground="True"/>
+	
+</samples>
