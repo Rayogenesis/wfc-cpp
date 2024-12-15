@@ -40,7 +40,7 @@ protected:
 	vector<pair<int, int>> stack;
 	int stacksize, observedSoFar;
 
-	int MX, MY, T, N;
+	int outputWidth, outputHeight, patternsTotal, patternSize;
 	bool periodic, ground;
 
 	vector<double> weights;
@@ -50,8 +50,8 @@ protected:
 	double sumOfWeights, sumOfWeightLogWeights, startingEntropy;
 	vector<double> sumsOfWeights, sumsOfWeightLogWeights, entropies;
 
-	static const vector<int> dx;
-	static const vector<int> dy;
+	static const vector<int> directionX;
+	static const vector<int> directionY;
 	static const vector<int> opposite;
 };
 

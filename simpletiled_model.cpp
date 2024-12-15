@@ -84,8 +84,8 @@ SimpleTiledModel::SimpleTiledModel(const string& name, const string& subsetName,
             b = [](int i) { return i; };
         }
 
-        T = action.size();
-        firstOccurrence[tilename] = T;
+        patternsTotal = action.size();
+        firstOccurrence[tilename] = patternsTotal;
 
         vector<vector<int>> map(cardinality, vector<int>(8));
         for (int t = 0; t < cardinality; ++t) {
@@ -99,7 +99,7 @@ SimpleTiledModel::SimpleTiledModel(const string& name, const string& subsetName,
             map[t][7] = b(a(a(a(t))));
 
             for (int s = 0; s < 8; ++s) {
-                map[t][s] += T;
+                map[t][s] += patternsTotal;
             }
             action.push_back(map[t]);
         }
@@ -125,10 +125,10 @@ SimpleTiledModel::SimpleTiledModel(const string& name, const string& subsetName,
 
             for (int t = 1; t < cardinality; ++t) {
                 if (t <= 3) {
-                    tiles.push_back(rotate(tiles[T + t - 1], tilesize));
+                    tiles.push_back(rotate(tiles[patternsTotal + t - 1], tilesize));
                 }
                 if (t >= 4) {
-                    tiles.push_back(reflect(tiles[T + t - 4], tilesize));
+                    tiles.push_back(reflect(tiles[patternsTotal + t - 4], tilesize));
                 }
                 tilenames.push_back(tilename + " " + to_string(t));
             }
@@ -142,11 +142,11 @@ SimpleTiledModel::SimpleTiledModel(const string& name, const string& subsetName,
     }
 
     // Inicializar propagadores
-    T = action.size();
+    patternsTotal = action.size();
     weights = weightList;
 
-    propagator = vector<vector<vector<int>>>(4, vector<vector<int>>(T));
-    vector<vector<vector<bool>>> densePropagator(4, vector<vector<bool>>(T, vector<bool>(T)));
+    propagator = vector<vector<vector<int>>>(4, vector<vector<int>>(patternsTotal));
+    vector<vector<vector<bool>>> densePropagator(4, vector<vector<bool>>(patternsTotal, vector<bool>(patternsTotal)));
 
     tinyxml2::XMLElement* xneighbor = root->FirstChildElement("neighbors")->FirstChildElement("neighbor");
     while (xneighbor) {
@@ -181,19 +181,19 @@ SimpleTiledModel::SimpleTiledModel(const string& name, const string& subsetName,
     }
 
     // Inicializar el resto de propagadores
-    for (int t2 = 0; t2 < T; ++t2) {
-        for (int t1 = 0; t1 < T; ++t1) {
+    for (int t2 = 0; t2 < patternsTotal; ++t2) {
+        for (int t1 = 0; t1 < patternsTotal; ++t1) {
             densePropagator[2][t2][t1] = densePropagator[0][t1][t2];
             densePropagator[3][t2][t1] = densePropagator[1][t1][t2];
         }
     }
 
-    vector<vector<vector<int>>> sparsePropagator(4, vector<vector<int>>(T));
+    vector<vector<vector<int>>> sparsePropagator(4, vector<vector<int>>(patternsTotal));
     for (int d = 0; d < 4; ++d) {
-        for (int t1 = 0; t1 < T; ++t1) {
+        for (int t1 = 0; t1 < patternsTotal; ++t1) {
             vector<int>& sp = sparsePropagator[d][t1];
             const vector<bool>& tp = densePropagator[d][t1];
-            for (int t2 = 0; t2 < T; ++t2) {
+            for (int t2 = 0; t2 < patternsTotal; ++t2) {
                 if (tp[t2]) {
                     sp.push_back(t2);
                 }
@@ -211,14 +211,14 @@ SimpleTiledModel::SimpleTiledModel(const string& name, const string& subsetName,
 
 // Guardar el resultado como imagen
 void SimpleTiledModel::Save(const string& filename) {
-    vector<int> bitmapData(MX * MY * tilesize * tilesize);
+    vector<int> bitmapData(outputWidth * outputHeight * tilesize * tilesize);
     if (observed[0] >= 0) {
-        for (int x = 0; x < MX; ++x) {
-            for (int y = 0; y < MY; ++y) {
-                const vector<int>& tile = tiles[observed[x + y * MX]];
+        for (int x = 0; x < outputWidth; ++x) {
+            for (int y = 0; y < outputHeight; ++y) {
+                const vector<int>& tile = tiles[observed[x + y * outputWidth]];
                 for (int dy = 0; dy < tilesize; ++dy) {
                     for (int dx = 0; dx < tilesize; ++dx) {
-                        bitmapData[x * tilesize + dx + (y * tilesize + dy) * MX * tilesize] = tile[dx + dy * tilesize];
+                        bitmapData[x * tilesize + dx + (y * tilesize + dy) * outputWidth * tilesize] = tile[dx + dy * tilesize];
                     }
                 }
             }
@@ -226,11 +226,11 @@ void SimpleTiledModel::Save(const string& filename) {
     }
     else {
         for (int i = 0; i < wave.size(); ++i) {
-            int x = i % MX, y = i / MX;
-            if (blackBackground && sumsOfOnes[i] == T) {
+            int x = i % outputWidth, y = i / outputWidth;
+            if (blackBackground && sumsOfOnes[i] == patternsTotal) {
                 for (int yt = 0; yt < tilesize; ++yt) {
                     for (int xt = 0; xt < tilesize; ++xt) {
-                        bitmapData[x * tilesize + xt + (y * tilesize + yt) * MX * tilesize] = 255 << 24;
+                        bitmapData[x * tilesize + xt + (y * tilesize + yt) * outputWidth * tilesize] = 255 << 24;
                     }
                 }
             }
@@ -239,9 +239,9 @@ void SimpleTiledModel::Save(const string& filename) {
                 double normalization = 1.0 / sumsOfWeights[i];
                 for (int yt = 0; yt < tilesize; ++yt) {
                     for (int xt = 0; xt < tilesize; ++xt) {
-                        int idi = x * tilesize + xt + (y * tilesize + yt) * MX * tilesize;
+                        int idi = x * tilesize + xt + (y * tilesize + yt) * outputWidth * tilesize;
                         double r = 0, g = 0, b = 0;
-                        for (int t = 0; t < T; ++t) {
+                        for (int t = 0; t < patternsTotal; ++t) {
                             if (w[t]) {
                                 int argb = tiles[t][xt + yt * tilesize];
                                 r += ((argb & 0xff0000) >> 16) * weights[t] * normalization;
@@ -256,7 +256,7 @@ void SimpleTiledModel::Save(const string& filename) {
         }
     }
 
-    SaveBitmap(bitmapData, MX * tilesize, MY * tilesize, filename);
+    SaveBitmap(bitmapData, outputWidth * tilesize, outputHeight * tilesize, filename);
 }
 
 // Recibe una función desde rotate o reflect con la que procesará un tile dado para devolverlo rotado o reflejado
@@ -283,9 +283,9 @@ vector<int> SimpleTiledModel::reflect(const vector<int>& array, int size) {
 // Generar salida en texto
 string SimpleTiledModel::TextOutput() const {
     stringstream result;
-    for (int y = 0; y < MY; ++y) {
-        for (int x = 0; x < MX; ++x) {
-            result << tilenames[observed[x + y * MX]] << ", ";
+    for (int y = 0; y < outputHeight; ++y) {
+        for (int x = 0; x < outputWidth; ++x) {
+            result << tilenames[observed[x + y * outputWidth]] << ", ";
         }
         result << "\n";
     }

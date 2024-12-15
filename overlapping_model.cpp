@@ -35,22 +35,22 @@ OverlappingModel::OverlappingModel(const string& name, int N, int width, int hei
 
     // Asignamos a C los colores únicos encontrados y definimos las posiciones de las que se extraerán los patrones
     int C = colors.size();
-    int xmax = periodicInput ? SX : SX - N + 1;
-    int ymax = periodicInput ? SY : SY - N + 1;
+    int xmax = periodicInput ? SX : SX - patternSize + 1;
+    int ymax = periodicInput ? SY : SY - patternSize + 1;
 
     for (int y = 0; y < ymax; y++) {
         for (int x = 0; x < xmax; x++) {
             // Creamos un vector con 8 patrones, 4 son para el original y sus rotaciones, otros 4 para cada reflejo
             vector<vector<uint8_t>> ps(8);
 
-            ps[0] = pattern([&](int dx, int dy) { return sample[(x + dx) % SX + (y + dy) % SY * SX]; }, N);
-            ps[1] = reflect(ps[0], N);
-            ps[2] = rotate(ps[0], N);
-            ps[3] = reflect(ps[2], N);
-            ps[4] = rotate(ps[2], N);
-            ps[5] = reflect(ps[4], N);
-            ps[6] = rotate(ps[4], N);
-            ps[7] = reflect(ps[6], N);
+            ps[0] = pattern([&](int dx, int dy) { return sample[(x + dx) % SX + (y + dy) % SY * SX]; }, patternSize);
+            ps[1] = reflect(ps[0], patternSize);
+            ps[2] = rotate(ps[0], patternSize);
+            ps[3] = reflect(ps[2], patternSize);
+            ps[4] = rotate(ps[2], patternSize);
+            ps[5] = reflect(ps[4], patternSize);
+            ps[6] = rotate(ps[4], patternSize);
+            ps[7] = reflect(ps[6], patternSize);
 
             // Recorremos los niveles de simetría definidos
             for (int k = 0; k < symmetry; k++) {
@@ -74,19 +74,19 @@ OverlappingModel::OverlappingModel(const string& name, int N, int width, int hei
 
     // Asignamos la lista de pesos y a T la cantidad de patrones únicos encontrados
     weights = weightList;
-    T = weights.size();
+    patternsTotal = weights.size();
     this->ground = ground;
 
     // Inicializamos el propagador con 4 direcciones
     propagator.resize(4);
     for (int d = 0; d < 4; d++) {
         // Cada dirección tiene un vector de tamaño T (patrones únicos)
-        propagator[d].resize(T);
-        for (int t = 0; t < T; t++) {
+        propagator[d].resize(patternsTotal);
+        for (int t = 0; t < patternsTotal; t++) {
             // Cada patrón contiene la lista de patrones compatibles gracias a la función agrees
             vector<int> list;
-            for (int t2 = 0; t2 < T; t2++) {
-                if (agrees(patterns[t], patterns[t2], dx[d], dy[d], N)) {
+            for (int t2 = 0; t2 < patternsTotal; t2++) {
+                if (agrees(patterns[t], patterns[t2], directionX[d], directionY[d], patternSize)) {
                     list.push_back(t2);
                 }
             }
@@ -144,32 +144,32 @@ bool OverlappingModel::agrees(const vector<uint8_t>& p1, const vector<uint8_t>& 
 }
 
 void OverlappingModel::Save(const string& filename) {
-    vector<int> bitmap(MX * MY, 0);
+    vector<int> bitmap(outputWidth * outputHeight, 0);
 
     if (observed[0] >= 0) {
-        for (int y = 0; y < MY; y++) {
-            int dy = (y < MY - N + 1) ? 0 : N - 1;
-            for (int x = 0; x < MX; x++) {
-                int dx = (x < MX - N + 1) ? 0 : N - 1;
-                bitmap[x + y * MX] = colors[patterns[observed[x - dx + (y - dy) * MX]][dx + dy * N]];
+        for (int y = 0; y < outputHeight; y++) {
+            int dy = (y < outputHeight - patternSize + 1) ? 0 : patternSize - 1;
+            for (int x = 0; x < outputWidth; x++) {
+                int dx = (x < outputWidth - patternSize + 1) ? 0 : patternSize - 1;
+                bitmap[x + y * outputWidth] = colors[patterns[observed[x - dx + (y - dy) * outputWidth]][dx + dy * patternSize]];
             }
         }
     }
     else {
         for (size_t i = 0; i < wave.size(); i++) {
             int contributors = 0, r = 0, g = 0, b = 0;
-            int x = i % MX;
-            int y = i / MX;
-            for (int dy = 0; dy < N; dy++) {
-                for (int dx = 0; dx < N; dx++) {
-                    int sx = (x - dx + MX) % MX;
-                    int sy = (y - dy + MY) % MY;
-                    int s = sx + sy * MX;
-                    if (!periodic && (sx + N > MX || sy + N > MY || sx < 0 || sy < 0)) continue;
-                    for (int t = 0; t < T; t++) {
+            int x = i % outputWidth;
+            int y = i / outputWidth;
+            for (int dy = 0; dy < patternSize; dy++) {
+                for (int dx = 0; dx < patternSize; dx++) {
+                    int sx = (x - dx + outputWidth) % outputWidth;
+                    int sy = (y - dy + outputHeight) % outputHeight;
+                    int s = sx + sy * outputWidth;
+                    if (!periodic && (sx + patternSize > outputWidth || sy + patternSize > outputHeight || sx < 0 || sy < 0)) continue;
+                    for (int t = 0; t < patternsTotal; t++) {
                         if (wave[s][t]) {
                             contributors++;
-                            int argb = colors[patterns[t][dx + dy * N]];
+                            int argb = colors[patterns[t][dx + dy * patternSize]];
                             r += (argb & 0xff0000) >> 16;
                             g += (argb & 0xff00) >> 8;
                             b += argb & 0xff;
@@ -181,5 +181,5 @@ void OverlappingModel::Save(const string& filename) {
         }
     }
 
-    SaveBitmap(bitmap, MX, MY, filename);
+    SaveBitmap(bitmap, outputWidth, outputHeight, filename);
 }

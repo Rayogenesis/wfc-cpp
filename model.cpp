@@ -2,27 +2,27 @@
 
 using namespace std;
 
-const vector<int> Model::dx = { -1, 0, 1, 0 };
-const vector<int> Model::dy = { 0, 1, 0, -1 };
+const vector<int> Model::directionX = { -1, 0, 1, 0 };
+const vector<int> Model::directionY = { 0, 1, 0, -1 };
 const vector<int> Model::opposite = { 2, 3, 0, 1 };
 
 Model::Model(int width, int height, int N, bool periodic, Heuristic heuristic)
-    : MX(width), MY(height), N(N), periodic(periodic), heuristic(heuristic),
+    : outputWidth(width), outputHeight(height), patternSize(N), periodic(periodic), heuristic(heuristic),
     stacksize(0), observedSoFar(0) {}
 
 // Inicializamos varias estructuras de datos que almacenan el estado actual del colapso de la función de onda
 // Calculamos los pesos y las entropías iniciales de cada celda
 void Model::Init() {
-    wave.resize(MX * MY, vector<bool>(T, true));
-    compatible.resize(MX * MY, vector<vector<int>>(T, vector<int>(4, 0)));
-    distribution.resize(T);
-    observed.resize(MX * MY, -1);
+    wave.resize(outputWidth * outputHeight, vector<bool>(patternsTotal, true));
+    compatible.resize(outputWidth * outputHeight, vector<vector<int>>(patternsTotal, vector<int>(4, 0)));
+    distribution.resize(patternsTotal);
+    observed.resize(outputWidth * outputHeight, -1);
 
-    weightLogWeights.resize(T);
+    weightLogWeights.resize(patternsTotal);
     sumOfWeights = 0;
     sumOfWeightLogWeights = 0;
 
-    for (int t = 0; t < T; ++t) {
+    for (int t = 0; t < patternsTotal; ++t) {
         weightLogWeights[t] = weights[t] * log(weights[t]);
         sumOfWeights += weights[t];
         sumOfWeightLogWeights += weightLogWeights[t];
@@ -30,12 +30,12 @@ void Model::Init() {
 
     startingEntropy = log(sumOfWeights) - sumOfWeightLogWeights / sumOfWeights;
 
-    sumsOfOnes.resize(MX * MY);
-    sumsOfWeights.resize(MX * MY);
-    sumsOfWeightLogWeights.resize(MX * MY);
-    entropies.resize(MX * MY);
+    sumsOfOnes.resize(outputWidth * outputHeight);
+    sumsOfWeights.resize(outputWidth * outputHeight);
+    sumsOfWeightLogWeights.resize(outputWidth * outputHeight);
+    entropies.resize(outputWidth * outputHeight);
 
-    stack.resize(wave.size() * T);
+    stack.resize(wave.size() * patternsTotal);
     stacksize = 0;
 }
 
@@ -57,7 +57,7 @@ bool Model::Run(int seed, int limit) {
         }
         else {
             for (int i = 0; i < wave.size(); ++i)
-                for (int t = 0; t < T; ++t)
+                for (int t = 0; t < patternsTotal; ++t)
                     if (wave[i][t]) {
                         observed[i] = t;
                         break;
@@ -72,7 +72,7 @@ bool Model::Run(int seed, int limit) {
 int Model::NextUnobservedNode(mt19937& random) {
     if (heuristic == Heuristic::Scanline) {
         for (int i = observedSoFar; i < wave.size(); ++i) {
-            if (!periodic && (i % MX + N > MX || i / MX + N > MY)) continue;
+            if (!periodic && (i % outputWidth + patternSize > outputWidth || i / outputWidth + patternSize > outputHeight)) continue;
             if (sumsOfOnes[i] > 1) {
                 observedSoFar = i + 1;
                 return i;
@@ -84,7 +84,7 @@ int Model::NextUnobservedNode(mt19937& random) {
     double min = 1E+4;
     int argmin = -1;
     for (int i = 0; i < wave.size(); ++i) {
-        if (!periodic && (i % MX + N > MX || i / MX + N > MY)) continue;
+        if (!periodic && (i % outputWidth + patternSize > outputWidth || i / outputWidth + patternSize > outputHeight)) continue;
         int remainingValues = sumsOfOnes[i];
         double entropy = heuristic == Heuristic::Entropy ? entropies[i] : remainingValues;
         if (remainingValues > 1 && entropy <= min) {
@@ -100,30 +100,30 @@ int Model::NextUnobservedNode(mt19937& random) {
 
 void Model::Observe(int node, mt19937& random) {
     vector<bool>& w = wave[node];
-    for (int t = 0; t < T; ++t) distribution[t] = w[t] ? weights[t] : 0.0;
+    for (int t = 0; t < patternsTotal; ++t) distribution[t] = w[t] ? weights[t] : 0.0;
     discrete_distribution<int> dist(distribution.begin(), distribution.end());
     int r = dist(random);
-    for (int t = 0; t < T; ++t)
+    for (int t = 0; t < patternsTotal; ++t)
         if (w[t] != (t == r)) Ban(node, t);
 }
 
 bool Model::Propagate() {
     while (stacksize > 0) {
         auto [i1, t1] = stack[--stacksize];
-        int x1 = i1 % MX;
-        int y1 = i1 / MX;
+        int x1 = i1 % outputWidth;
+        int y1 = i1 / outputWidth;
 
         for (int d = 0; d < 4; ++d) {
-            int x2 = x1 + dx[d];
-            int y2 = y1 + dy[d];
-            if (!periodic && (x2 < 0 || y2 < 0 || x2 + N > MX || y2 + N > MY)) continue;
+            int x2 = x1 + directionX[d];
+            int y2 = y1 + directionY[d];
+            if (!periodic && (x2 < 0 || y2 < 0 || x2 + patternSize > outputWidth || y2 + patternSize > outputHeight)) continue;
 
-            if (x2 < 0) x2 += MX;
-            else if (x2 >= MX) x2 -= MX;
-            if (y2 < 0) y2 += MY;
-            else if (y2 >= MY) y2 -= MY;
+            if (x2 < 0) x2 += outputWidth;
+            else if (x2 >= outputWidth) x2 -= outputWidth;
+            if (y2 < 0) y2 += outputHeight;
+            else if (y2 >= outputHeight) y2 -= outputHeight;
 
-            int i2 = x2 + y2 * MX;
+            int i2 = x2 + y2 * outputWidth;
             const vector<int>& p = propagator[d][t1];
             vector<vector<int>>& compat = compatible[i2];
 
@@ -159,7 +159,7 @@ void Model::Ban(int i, int t) {
 void Model::Clear() {
     for (int i = 0; i < wave.size(); ++i) {
         fill(wave[i].begin(), wave[i].end(), true);
-        for (int t = 0; t < T; ++t) {
+        for (int t = 0; t < patternsTotal; ++t) {
             for (int d = 0; d < 4; ++d)
                 compatible[i][t][d] = propagator[opposite[d]][t].size();
         }
@@ -173,9 +173,9 @@ void Model::Clear() {
     observedSoFar = 0;
 
     if (ground) {
-        for (int x = 0; x < MX; ++x) {
-            for (int t = 0; t < T - 1; ++t) Ban(x + (MY - 1) * MX, t);
-            for (int y = 0; y < MY - 1; ++y) Ban(x + y * MX, T - 1);
+        for (int x = 0; x < outputWidth; ++x) {
+            for (int t = 0; t < patternsTotal - 1; ++t) Ban(x + (outputHeight - 1) * outputWidth, t);
+            for (int y = 0; y < outputHeight - 1; ++y) Ban(x + y * outputWidth, patternsTotal - 1);
         }
         Propagate();
     }
