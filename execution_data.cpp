@@ -29,7 +29,7 @@ void ExecutionData::PrintResults() {
 
     for (int exec = 0; exec < executions; exec++)
     {
-        contradictions[exec] == 10 ? ++fails : contradictionsMean += contradictions[exec];
+        contradictions[exec] == tries ? ++fails : contradictionsMean += contradictions[exec];
         duration += durations[exec];
     }
 
